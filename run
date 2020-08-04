@@ -1,0 +1,15 @@
+#!/bin/bash
+HEAPSIZE='-Xmx500M'
+export CLASSPATH=".:/usr/local/lib/antlr-4.8-complete.jar:$CLASSPATH"
+antlr4="java $HEAPSIZE org.antlr.v4.Tool"
+grun="java $HEAPSIZE org.antlr.v4.gui.TestRig"
+
+lang='ctf'
+parserRule='compilationUnit'
+
+#$antlr4 -Dlanguage=JavaScript $lang.g4
+
+$antlr4  $lang.g4 && \
+javac  "$lang"Parser.java && \
+$grun $lang $parserRule -tree $* #-tokens -trace 
+
