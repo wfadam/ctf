@@ -1661,20 +1661,22 @@ public class ctfParser extends Parser {
 
 	public static class ExpressionContext extends ParserRuleContext {
 		public Token arrayid;
+		public ExpressionContext idx;
 		public Token prefix;
 		public Token bop;
+		public Token assignOp;
 		public PrimaryContext primary() {
 			return getRuleContext(PrimaryContext.class,0);
 		}
 		public TerminalNode LBRACK() { return getToken(ctfParser.LBRACK, 0); }
+		public TerminalNode RBRACK() { return getToken(ctfParser.RBRACK, 0); }
+		public TerminalNode IDENTIFIER() { return getToken(ctfParser.IDENTIFIER, 0); }
 		public List<ExpressionContext> expression() {
 			return getRuleContexts(ExpressionContext.class);
 		}
 		public ExpressionContext expression(int i) {
 			return getRuleContext(ExpressionContext.class,i);
 		}
-		public TerminalNode RBRACK() { return getToken(ctfParser.RBRACK, 0); }
-		public TerminalNode IDENTIFIER() { return getToken(ctfParser.IDENTIFIER, 0); }
 		public MethodCallContext methodCall() {
 			return getRuleContext(MethodCallContext.class,0);
 		}
@@ -1747,7 +1749,7 @@ public class ctfParser extends Parser {
 				setState(236);
 				match(LBRACK);
 				setState(237);
-				expression(0);
+				((ExpressionContext)_localctx).idx = expression(0);
 				setState(238);
 				match(RBRACK);
 				}
@@ -1939,10 +1941,10 @@ public class ctfParser extends Parser {
 						setState(272);
 						if (!(precpred(_ctx, 1))) throw new FailedPredicateException(this, "precpred(_ctx, 1)");
 						setState(273);
-						((ExpressionContext)_localctx).bop = _input.LT(1);
+						((ExpressionContext)_localctx).assignOp = _input.LT(1);
 						_la = _input.LA(1);
 						if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << ASSIGN) | (1L << ADD_ASSIGN) | (1L << SUB_ASSIGN) | (1L << AND_ASSIGN) | (1L << OR_ASSIGN))) != 0)) ) {
-							((ExpressionContext)_localctx).bop = (Token)_errHandler.recoverInline(this);
+							((ExpressionContext)_localctx).assignOp = (Token)_errHandler.recoverInline(this);
 						}
 						else {
 							if ( _input.LA(1)==Token.EOF ) matchedEOF = true;

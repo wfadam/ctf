@@ -114,7 +114,7 @@ methodCall
 
 expression
     : primary                       
-    | arrayid=IDENTIFIER '[' expression ']' 
+    | arrayid=IDENTIFIER '[' idx=expression ']' 
     | methodCall                    
     | prefix=('~'|'!') expression
     | expression bop=('*'|'/'|'%') expression               
@@ -126,7 +126,7 @@ expression
     | expression bop='|' expression
     | expression bop='&&' expression
     | expression bop='||' expression
-    | expression bop=('=' | '+=' | '-=' | '&=' | '|=') expression    
+    | expression assignOp=('=' | '+=' | '-=' | '&=' | '|=') expression    
     ;
 
 primary
