@@ -26,7 +26,7 @@ variableDeclaration
     ;
 
 variableDeclaratorId
-    : id=IDENTIFIER ('[' ']')*
+    : id=IDENTIFIER ('[' expression? ']')*
     ;
 
 variableInitializer
@@ -116,7 +116,7 @@ expression
     : primary                       
     | arrayid=IDENTIFIER '[' idx=expression ']' 
     | methodCall                    
-    | prefix=('~'|'!') expression
+    | prefix=('~'|'!'|'+'|'-') expression
     | expression bop=('*'|'/'|'%') expression               
     | expression bop=('+'|'-') expression                   
     | expression bop=('<=' | '>=' | '>' | '<') expression   

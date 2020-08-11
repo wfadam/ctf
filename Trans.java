@@ -112,6 +112,7 @@ class CTX {
         do {
             if(cache.containsKey(_ctx)) {
                 cache.get(_ctx).add(msg);
+                //System.out.printf("submitText by %s with %s\n", ctx.getClass(), msg);
                 return;
             }
         } while((_ctx = _ctx.getParent()) != null);
@@ -137,6 +138,15 @@ class Util {
             //empty 
         }
         return false;
+    }
+
+    static public int toInt(String key) {
+        String _key = key.toLowerCase();
+        if(_key.startsWith("0x")) {
+            return Integer.parseInt(_key.substring(2), 16);
+        } else {
+            return Integer.valueOf(_key);
+        }
     }
 
     static public void checkInt(ParserRuleContext ctx, String key) {
@@ -353,18 +363,24 @@ class CtfListener extends ctfBaseListener{
 
                 if(Util.isInt(ctx.getText())) {
                     int initLen = CTX.queryLength(ctx, _parent.IDENTIFIER().getText());
-                    int len = Integer.valueOf(ctx.getText());
+                    int len = Util.toInt(ctx.getText());
                     if(0 <= len && len < initLen) {
                         //empty
                     } else {
                         throw new RuntimeException(String.format("Line%d: %s \n\tArray index out of range", ctx.getStart().getLine(), _parent.getText()));
                     }
-                } 
+                } else {
+                    // skip checking boundary when a variable is used as index
+                }
                 return;
             }
         }
 
         CTX.submitText(ctx, ids.get(0));
+    }
+
+	@Override public void enterVariableDeclaratorId(ctfParser.VariableDeclaratorIdContext ctx) { 
+        CTX.newCache(ctx);  // to avoid array length expression evaluation 
     }
 
     @Override public void enterVariableDeclaration(ctfParser.VariableDeclarationContext ctx) { 
@@ -374,10 +390,37 @@ class CtfListener extends ctfBaseListener{
             CTX.register(ctx, id, Arrays.asList(type));
         } else {
             CTX.register(ctx, id, Arrays.asList("[" + type));
-            if(ctx.variableInitializer() != null && ctx.variableInitializer().arrayInitializer() != null) {
-                int len = ctx.variableInitializer().arrayInitializer().variableInitializer().size();
-                CTX.registerLength(ctx, id, len);
+
+            int defLen = 0;
+            if(ctx.variableDeclaratorId().expression().size() > 0) {
+                try {
+                    defLen = Util.toInt(ctx.variableDeclaratorId().expression().get(0).getText());
+                } catch(Exception e) {
+                    throw new RuntimeException(String.format("%s can not define the array %s\n", ctx.variableDeclaratorId().expression().get(0).getText(), id));
+                }
             }
+
+            int initLen = 0;
+            if(ctx.variableInitializer() != null && ctx.variableInitializer().arrayInitializer() != null) {
+                initLen = ctx.variableInitializer().arrayInitializer().variableInitializer().size();
+            }
+
+            if(defLen == 0 && initLen == 0) {
+                throw new RuntimeException(String.format("Can not define the empty array %s\n", id));
+            }
+
+            int len = 0;
+            if(defLen == 0 && initLen > 0) {        // int arr[] = {3};
+                len = initLen;
+            } else if(defLen > 0 && initLen == 0) { // int arr[1];
+                len = defLen;
+            } else if(defLen == initLen) {          // int arr[1] = {3};
+                len = defLen;
+            } else {                                // int arr[1] = {2, 3};
+                throw new RuntimeException(String.format("%s[%d] is defined but initialized with %d elements\n", id, defLen, initLen));
+            }
+
+            CTX.registerLength(ctx, id, len);
         }
 
         CTX.newCache(ctx);
