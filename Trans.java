@@ -70,7 +70,7 @@ class CTX {
         throw new RuntimeException(String.format("Failed to find context for %s", ctx));
     }
 
-     static private Map<String, List<String>> getContext(ParserRuleContext ctx) {
+    static private Map<String, List<String>> getContext(ParserRuleContext ctx) {
         ParserRuleContext _ctx = ctx;
         do {
             if(context.containsKey(_ctx)) {
@@ -218,6 +218,48 @@ class CtfListener extends ctfBaseListener{
                 }
             }
         }
+
+        if(! "void".equals(types.get(0))) {
+            List<ctfParser.BlockStatementContext> stmts = ctx.methodBody().block().blockStatement();
+            if(stmts.size() > 0) {
+                ctfParser.StatementContext obj = stmts.get(stmts.size() - 1).statement();
+                if(obj != null && obj.RETURN() != null) {
+                    CTX.newCache(obj, types.get(0));
+                } else {
+                    throw new RuntimeException(String.format("Miss return statement in %s\n", key));
+                }
+            }
+        }
+    }
+
+    @Override public void exitMethodDeclaration(ctfParser.MethodDeclarationContext ctx) { 
+        String key = "(" + ctx.IDENTIFIER().getText();
+        List<String> types = CTX.query(ctx.getParent(), key);
+        if(! "void".equals(types.get(0))) {
+            List<ctfParser.BlockStatementContext> stmts = ctx.methodBody().block().blockStatement();
+            if(stmts.size() > 0) {
+                ctfParser.StatementContext obj = stmts.get(stmts.size() - 1).statement();
+                if(obj != null && obj.RETURN() != null) {
+                    List<String> ids = CTX.dumpCache(obj);
+                    String preTyp = ids.get(0);
+                    ids.remove(0);
+                    String curTyp = "";
+                    for(String id : ids) {
+                        if(Util.isChar(id)) {
+                            curTyp = "char";
+                        } else if(Util.isInt(id)) {
+                            curTyp = "int";
+                        } else { // query type for an id
+                            curTyp = CTX.query(ctx, id).get(0);
+                        }
+
+                        if(! preTyp.equals(curTyp)) {
+                            throw new RuntimeException(String.format("%s is %s type, incompatible with %s type of %s", id, curTyp, preTyp, key));
+                        } 
+                    }
+                } 
+            }
+        }
     }
 
     @Override public void enterMethodCall(ctfParser.MethodCallContext ctx) {
@@ -252,9 +294,10 @@ class CtfListener extends ctfBaseListener{
 
     }
 
-
     @Override public void enterStatement(ctfParser.StatementContext ctx) { 
-        CTX.newCache(ctx);
+        if(ctx.RETURN() == null) {
+            CTX.newCache(ctx);
+        }
     }
 
     @Override public void enterExpression(ctfParser.ExpressionContext ctx) { 
@@ -268,6 +311,7 @@ class CtfListener extends ctfBaseListener{
     @Override public void exitExpression(ctfParser.ExpressionContext ctx) { 
         List<String> ids = CTX.dumpCache(ctx);
         String preTyp = "";
+        String preId = "";
         String curTyp = "";
         for(String id : ids) {
             if(Util.isChar(id)) {
@@ -283,10 +327,11 @@ class CtfListener extends ctfBaseListener{
 
             if(preTyp.isEmpty()) {
                 preTyp = curTyp;
+                preId = id;
             }
 
             if(! preTyp.equals(curTyp)) {
-                throw new RuntimeException(String.format("%s is %s type, but expect %s type in %s", id, curTyp, preTyp, ctx.getText()));
+                throw new RuntimeException(String.format("%s is %s type, incompatible with %s type of %s in %s", id, curTyp, preTyp, preId, ctx.getText()));
             } 
         }
 
@@ -337,6 +382,7 @@ class CtfListener extends ctfBaseListener{
 
         CTX.newCache(ctx);
     }
+
     @Override public void exitVariableDeclaration(ctfParser.VariableDeclarationContext ctx) {
         List<String> syms = CTX.dumpCache(ctx);
 
@@ -360,7 +406,6 @@ class CtfListener extends ctfBaseListener{
 
         }
     }
-
 
     @Override public void enterPrimary(ctfParser.PrimaryContext ctx) {
         if(ctx.literal() != null) { 
