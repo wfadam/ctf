@@ -12,7 +12,7 @@ class CTX {
     static private Map<ParserRuleContext, Map<String, Integer>> arrayLen = new HashMap<ParserRuleContext, Map<String, Integer>>();
     static private Map<ParserRuleContext, List<String>> cache = new HashMap<ParserRuleContext, List<String>>();
 
-    static public void create(ParserRuleContext ctx) {
+    final public static void create(ParserRuleContext ctx) {
         if(context.get(ctx) == null) {
             context.put(
                     ctx,
@@ -20,35 +20,58 @@ class CTX {
             arrayLen.put(
                     ctx,
                     new HashMap<String, Integer>());
-            System.out.printf("Created context %s%s\n", ctx.getClass().getSimpleName(), ctx);
+            //System.out.printf("Created context %s%s\n", ctx.getClass().getSimpleName(), ctx);
         }
     }
 
-    static public void register(ParserRuleContext ctx, String key, List<String> types) {
+    final public static void register(ParserRuleContext ctx, String key, List<String> types) {
         Map<String, List<String>> kv = getContext(ctx);
         if(kv.containsKey(key)) {
             throw new RuntimeException(String.format("\n\tLine %d: %s is already defined", ctx.getStart().getLine(), key));
         }
         kv.put(key, types);
-        System.out.printf("Defined %s as %s\n", key, types);
+        //System.out.printf("Defined %s as %s\n", key, types);
     }
 
-    static public void registerLength(ParserRuleContext ctx, String key, int len) {
+    final public static void registerLength(ParserRuleContext ctx, String key, int len) {
         Map<String, Integer> kv = arrayLen.get(getCover(ctx));
         if(kv.containsKey(key)) {
             throw new RuntimeException(String.format("\n\tLine %d: %s is already defined with length", ctx.getStart().getLine(), key));
         }
         kv.put(key, len);
-        System.out.printf("Recorded %s with length %d\n", key, len);
+        //System.out.printf("Recorded %s with length %d\n", key, len);
     }
 
-    static public List<String> query(ParserRuleContext ctx, String key) {
-        Map<String, List<String>> kv = getContext(ctx);
-        List<String> ls = kv.get(key);
-        if(ls == null) {
-            throw new RuntimeException(String.format("Line%d: %s is not defined yet", ctx.getStart().getLine(), key));
+    final private static List<String> unboxType(List<String> ls, String cover) {
+        List<String> __ls = new ArrayList<String>(ls);
+        String type = __ls.get(0);
+        if(type.startsWith(cover)) {
+            __ls.set(0, type.substring(1));
+            return __ls;
         }
-        return ls;
+        throw new RuntimeException(String.format("unboxing invalid %s type", type));
+    }
+
+    final public static List<String> query(ParserRuleContext ctx, String key) {
+        Map<String, List<String>> kv = getContext(ctx);
+
+        // for variables
+        List<String> ls = kv.get(key);
+        if(ls != null) {
+            return new ArrayList<String>(ls); //defensive copy
+        }
+
+        // for arrays and functions
+        ls = kv.get(key.substring(1));  
+        if(ls != null) {
+            switch(key.substring(0, 1)) {
+                case "(": return unboxType(ls, "(");
+                case "[": return unboxType(ls, "[");
+                default: break;
+            }
+        }
+
+        throw new RuntimeException(String.format("\n\tLine %d: %s is not defined yet", ctx.getStart().getLine(), key));
     }
 
     static public Integer queryLength(ParserRuleContext ctx, String key) {
@@ -84,7 +107,7 @@ class CTX {
 
     static public void newCache(ParserRuleContext ctx) {
         if(cache.containsKey(ctx)) {
-            throw new RuntimeException(String.format("%s has already created cache \"%s\"", ctx.getClass().getSimpleName(), cache.get(ctx)));
+            throw new RuntimeException(String.format("%s has already created cache \"%s\"", ctx.getText(), cache.get(ctx)));
         }
         List<String> ls = new ArrayList<String>();
         cache.put(ctx, ls);
@@ -92,7 +115,7 @@ class CTX {
 
     static public void newCache(ParserRuleContext ctx, String id) {
         if(cache.containsKey(ctx)) {
-            throw new RuntimeException(String.format("%s has already created cache \"%s\"", ctx.getClass().getSimpleName(), cache.get(ctx)));
+            throw new RuntimeException(String.format("%s has already created cache \"%s\"", ctx.getText(), cache.get(ctx)));
         }
         List<String> ls = new ArrayList<String>();
         ls.add(id);
@@ -112,20 +135,21 @@ class CTX {
         do {
             if(cache.containsKey(_ctx)) {
                 cache.get(_ctx).add(msg);
-                //System.out.printf("submitText by %s with %s\n", ctx.getClass(), msg);
+                //Util.pp("submitText by %s with %s\n", ctx.getClass(), msg);
                 return;
             }
         } while((_ctx = _ctx.getParent()) != null);
         throw new RuntimeException(String.format("Failed to find cache for %s", ctx.getClass().getSimpleName()));
     }
+
 }
 
 class Util {
-    static public boolean isChar(String key) {
+    final public static boolean isChar(String key) {
         return key.startsWith("\"") && key.endsWith("\"");
     }
 
-    static public boolean isInt(String key) {
+    final public static boolean isInt(String key) {
         try {
             String _key = key.toLowerCase();
             if(_key.startsWith("0x")) {
@@ -135,12 +159,11 @@ class Util {
             }
             return true;
         } catch(Exception e) {
-            //empty 
+            return false;
         }
-        return false;
     }
 
-    static public int toInt(String key) {
+    final public static int toInt(String key) {
         String _key = key.toLowerCase();
         if(_key.startsWith("0x")) {
             return Integer.parseInt(_key.substring(2), 16);
@@ -149,55 +172,51 @@ class Util {
         }
     }
 
-    static public void checkInt(ParserRuleContext ctx, String key) {
-        if(isInt(key)) {
-            return;
-        }
-
+    final public static void checkInt(ParserRuleContext ctx, String expTyp, String key) {
+        String errmsg = String.format("%s is assigned to %s type in %s", key, expTyp, ctx.getText());
         if(isChar(key)) {
-            throw new RuntimeException(String.format("%s is a string other than integer in %s", key, ctx.getText()));
+            throw new RuntimeException(errmsg);
         }
 
-        List<String> tt = null;
-        try {
-            tt = CTX.query(ctx, key);
-        } catch(Exception e2) {
-            try {
-                CTX.query(ctx, "(" + key);
-            } catch(Exception e3) {
-                throw new RuntimeException(String.format("\"%s\" is undefined in %s", key, ctx.getClass().getSimpleName()));
+        if(isInt(key)) { 
+            if(! "int".equals(expTyp)) {
+                throw new RuntimeException(errmsg);
             }
-            throw new RuntimeException(String.format("Function \"%s\" is not properly called %s", key, ctx.getClass().getSimpleName()));
-        } 
-        if(! "int".equals(tt.get(0))) {
-            throw new RuntimeException(String.format("Incompatible %s variable %s is assigned to int type", tt.get(0), key));
-        } 
+        } else {
+            List<String> tt = CTX.query(ctx, key);
+            if(! expTyp.equals(tt.get(0))) {
+                throw new RuntimeException(String.format("%s with %s type is assigned to %s type in %s", key, tt.get(0), expTyp, ctx.getText()));
+            }
+        }
     }
 
-    static public void checkStr(ParserRuleContext ctx, String key) {
-        if(isChar(key)) {
-            return;
-        } 
-
+    final public static void checkStr(ParserRuleContext ctx, String expTyp, String key) {
+        String errmsg = String.format("%s is assigned to %s type in %s", key, expTyp, ctx.getText());
         if(isInt(key)) {
-            throw new RuntimeException(String.format("%s is an integer other than string in %s", key, ctx.getText()));
+            throw new RuntimeException(errmsg);
         }
 
-        List<String> tt = null;
-        try {
-            tt = CTX.query(ctx, key);
-        } catch(Exception e2) {
-            try {
-                CTX.query(ctx, "(" + key);
-            } catch(Exception e3) {
-                throw new RuntimeException(String.format("\"%s\" is undefined in %s", key, ctx.getClass().getSimpleName()));
+        if(isChar(key)) { 
+            if(! "char".equals(expTyp)) {
+                throw new RuntimeException(errmsg);
             }
-            throw new RuntimeException(String.format("Function \"%s\" is not properly called %s", key, ctx.getClass().getSimpleName()));
-        } 
-        if(! "char".equals(tt.get(0))) {
-            throw new RuntimeException(String.format("Incompatible %s variable %s is assigned to char type", tt.get(0), key));
-        } 
+        } else {
+            List<String> tt = CTX.query(ctx, key);
+            if(! expTyp.equals(tt.get(0))) {
+                throw new RuntimeException(String.format("%s with %s type is assigned to %s type in %s", key, tt.get(0), expTyp, ctx.getText()));
+            } 
+        }
     }
+
+    final public static void pp(String fmt, Object...args) {
+        if(args.length > 0) System.out.printf(fmt, args);
+        else System.out.println(fmt);
+    }
+
+    final public static void pp(Object obj) {
+        System.out.println(obj);
+    }
+
 }
 
 class CtfListener extends ctfBaseListener{
@@ -205,12 +224,18 @@ class CtfListener extends ctfBaseListener{
         CTX.create(ctx);
     }
     @Override public void enterMethodDeclaration(ctfParser.MethodDeclarationContext ctx) { 
-        String key = "(" + ctx.IDENTIFIER().getText();
+        String key = ctx.IDENTIFIER().getText();
         List<String> types = new ArrayList<String>();
-        types.add(ctx.typeTypeOrVoid().getText());
+        types.add("(" + ctx.typeTypeOrVoid().getText());
         if(ctx.formalParameters().formalParameterList() != null) {
             for(ctfParser.FormalParameterContext _ctx : ctx.formalParameters().formalParameterList().formalParameter()) {
-                types.add(_ctx.primitiveType().getText());
+                String type = _ctx.primitiveType().getText();
+                String id = _ctx.variableDeclaratorId().IDENTIFIER().getText();
+                if(id.equals(_ctx.variableDeclaratorId().getText())) {
+                    types.add(type);
+                } else {
+                    types.add("[" + type);
+                }
             }
         }
 
@@ -221,31 +246,30 @@ class CtfListener extends ctfBaseListener{
             for(ctfParser.FormalParameterContext _ctx : ctx.formalParameters().formalParameterList().formalParameter()) {
                 String type = _ctx.primitiveType().getText();
                 String id = _ctx.variableDeclaratorId().id.getText();
-                if(id.equals(_ctx.variableDeclaratorId().getText())) {
-                    CTX.register(_ctx, id, Arrays.asList(type));
-                } else {
-                    CTX.register(_ctx, id, Arrays.asList("[" + type));
-                }
+                if(! id.equals(_ctx.variableDeclaratorId().getText())) {
+                    type = "[" + type;
+                } 
+                CTX.register(_ctx, id, Arrays.asList(type));
             }
         }
 
-        if(! "void".equals(types.get(0))) {
+        if(! types.get(0).endsWith("void")) {
             List<ctfParser.BlockStatementContext> stmts = ctx.methodBody().block().blockStatement();
             if(stmts.size() > 0) {
                 ctfParser.StatementContext obj = stmts.get(stmts.size() - 1).statement();
                 if(obj != null && obj.RETURN() != null) {
                     CTX.newCache(obj, types.get(0));
                 } else {
-                    throw new RuntimeException(String.format("Miss return statement in %s\n", key));
+                    throw new RuntimeException(String.format("Missing return statement in function %s\n", key));
                 }
             }
         }
     }
 
     @Override public void exitMethodDeclaration(ctfParser.MethodDeclarationContext ctx) { 
-        String key = "(" + ctx.IDENTIFIER().getText();
+        String key = ctx.IDENTIFIER().getText();
         List<String> types = CTX.query(ctx.getParent(), key);
-        if(! "void".equals(types.get(0))) {
+        if(! types.get(0).endsWith("void")) {
             List<ctfParser.BlockStatementContext> stmts = ctx.methodBody().block().blockStatement();
             if(stmts.size() > 0) {
                 ctfParser.StatementContext obj = stmts.get(stmts.size() - 1).statement();
@@ -263,8 +287,8 @@ class CtfListener extends ctfBaseListener{
                             curTyp = CTX.query(ctx, id).get(0);
                         }
 
-                        if(! preTyp.equals(curTyp)) {
-                            throw new RuntimeException(String.format("%s is %s type, incompatible with %s type of %s", id, curTyp, preTyp, key));
+                        if(! preTyp.endsWith(curTyp)) {
+                            throw new RuntimeException(String.format("Returning %s with %s type, but function %s returns %s type", id, curTyp, key, preTyp));
                         } 
                     }
                 } 
@@ -273,32 +297,26 @@ class CtfListener extends ctfBaseListener{
     }
 
     @Override public void enterMethodCall(ctfParser.MethodCallContext ctx) {
-        String id = "(" + ctx.IDENTIFIER().getText();
-        CTX.submitText(ctx, id);
-
+        CTX.submitText(ctx, "(" + ctx.IDENTIFIER().getText());
         CTX.newCache(ctx);
     }
 
     @Override public void exitMethodCall(ctfParser.MethodCallContext ctx) { 
-        String id = "(" + ctx.IDENTIFIER().getText();
+        String id = ctx.IDENTIFIER().getText();
         List<String> types = new ArrayList<String>(CTX.query(ctx, id)); // must copy
         types.remove(0);    // remove return type of the method
         List<String> tt = CTX.dumpCache(ctx); 
 
         if(types.size() != tt.size()) {
-            throw new RuntimeException(String.format("Incorrect number of arguments supplied to %s(%s)\n", id, types.toString().replace("[", "").replace("]", "")));
+            throw new RuntimeException(String.format("Incorrect number of arguments supplied to %s(%s)\n", id, types));
         }
 
         for(int i = 0; i < types.size(); i++) {
-            switch(types.get(i)) {
-                case "int":
-                    Util.checkInt(ctx, tt.get(i));
-                    break;
-                case "char":
-                    Util.checkStr(ctx, tt.get(i));
-                    break;
-                default:
-                    throw new RuntimeException(String.format("____Unsupported type check for %s in %s\n", types.get(i), ctx.getClass().getSimpleName()));
+            if(types.get(i).endsWith("int")) {
+                Util.checkInt(ctx, types.get(i), tt.get(i));
+            }
+            if(types.get(i).endsWith("char")) {
+                Util.checkStr(ctx, types.get(i), tt.get(i));
             }
         }
 
@@ -311,8 +329,8 @@ class CtfListener extends ctfBaseListener{
     }
 
     @Override public void enterExpression(ctfParser.ExpressionContext ctx) { 
-        if(ctx.arrayid != null) {
-            CTX.newCache(ctx, ctx.arrayid.getText());
+        if(ctx.IDENTIFIER() != null) {
+            CTX.newCache(ctx, "[" + ctx.IDENTIFIER().getText());
         } else {
             CTX.newCache(ctx);
         }
@@ -328,11 +346,8 @@ class CtfListener extends ctfBaseListener{
                 curTyp = "char";
             } else if(Util.isInt(id)) {
                 curTyp = "int";
-            } else { // query type for an id
+            } else {
                 curTyp = CTX.query(ctx, id).get(0);
-                if(curTyp.startsWith("[")) {
-                    curTyp = curTyp.substring(1);
-                }
             }
 
             if(preTyp.isEmpty()) {
@@ -358,34 +373,34 @@ class CtfListener extends ctfBaseListener{
             ctfParser.ExpressionContext _parent = (ctfParser.ExpressionContext)parent;
             if(_parent.idx == ctx) {
                 if(! "int".equals(preTyp)) {
-                    throw new RuntimeException(String.format("Line%d: %s \n\tShould use integers as the array index\n", ctx.getStart().getLine(), _parent.getText()));
+                    throw new RuntimeException(String.format("Line %d: %s \n\tShould use an integer as the array index\n", ctx.getStart().getLine(), _parent.getText()));
                 }
 
                 if(Util.isInt(ctx.getText())) {
-                    int initLen = CTX.queryLength(ctx, _parent.IDENTIFIER().getText());
+                    int initLen = CTX.queryLength(ctx,  _parent.IDENTIFIER().getText());
                     int len = Util.toInt(ctx.getText());
                     if(0 <= len && len < initLen) {
                         //empty
                     } else {
-                        throw new RuntimeException(String.format("Line%d: %s \n\tArray index out of range", ctx.getStart().getLine(), _parent.getText()));
+                        throw new RuntimeException(String.format("Line %d: %s \n\tArray index out of range", ctx.getStart().getLine(), _parent.getText()));
                     }
                 } else {
-                    // skip checking boundary when a variable is used as index
+                    // skip checking boundary when a variable is used as an index
                 }
-                return;
+                return; // avoid index expression to contaminate parent cache 
             }
         }
 
         CTX.submitText(ctx, ids.get(0));
     }
 
-	@Override public void enterVariableDeclaratorId(ctfParser.VariableDeclaratorIdContext ctx) { 
+    @Override public void enterVariableDeclaratorId(ctfParser.VariableDeclaratorIdContext ctx) { 
         CTX.newCache(ctx);  // to avoid array length expression evaluation 
     }
 
     @Override public void enterVariableDeclaration(ctfParser.VariableDeclarationContext ctx) { 
         String type = ctx.primitiveType().getText();
-        String id = ctx.variableDeclaratorId().id.getText();
+        String id = ctx.variableDeclaratorId().IDENTIFIER().getText();
         if(id.equals(ctx.variableDeclaratorId().getText())) {
             CTX.register(ctx, id, Arrays.asList(type));
         } else {
@@ -396,7 +411,7 @@ class CtfListener extends ctfBaseListener{
                 try {
                     defLen = Util.toInt(ctx.variableDeclaratorId().expression().get(0).getText());
                 } catch(Exception e) {
-                    throw new RuntimeException(String.format("%s can not define the array %s\n", ctx.variableDeclaratorId().expression().get(0).getText(), id));
+                    throw new RuntimeException(String.format("%s can not define the length of %s\n", ctx.variableDeclaratorId().expression().get(0).getText(), id));
                 }
             }
 
@@ -405,14 +420,10 @@ class CtfListener extends ctfBaseListener{
                 initLen = ctx.variableInitializer().arrayInitializer().variableInitializer().size();
             }
 
-            if(defLen == 0 && initLen == 0) {
-                throw new RuntimeException(String.format("Can not define the empty array %s\n", id));
-            }
-
             int len = 0;
             if(defLen == 0 && initLen > 0) {        // int arr[] = {3};
                 len = initLen;
-            } else if(defLen > 0 && initLen == 0) { // int arr[1];
+            } else if(defLen > 0 && initLen == 0) { // int arr[1]; or int arr[1] = {};
                 len = defLen;
             } else if(defLen == initLen) {          // int arr[1] = {3};
                 len = defLen;
@@ -427,27 +438,23 @@ class CtfListener extends ctfBaseListener{
     }
 
     @Override public void exitVariableDeclaration(ctfParser.VariableDeclarationContext ctx) {
-        List<String> syms = CTX.dumpCache(ctx);
-
-        String id = ctx.variableDeclaratorId().id.getText();
-        String type = CTX.query(ctx, id).get(0);
-        switch(type) {
-            case "int":
-            case "[int":
-                for(String key : syms) {
-                    Util.checkInt(ctx, key);
-                }
-                break;
-            case "char":
-            case "[char":
-                for(String key : syms) {
-                    Util.checkStr(ctx, key);
-                }
-                break;
-            default:
-                throw new RuntimeException(String.format("Unsupported type check for %s", type));
-
+        String type = ctx.primitiveType().getText();
+        String id = ctx.variableDeclaratorId().IDENTIFIER().getText();
+        if(! id.equals(ctx.variableDeclaratorId().getText())) {
+            id = "[" + id;
         }
+
+        List<String> syms = CTX.dumpCache(ctx);
+        if(type.endsWith("int")) {
+            for(String key : syms) {
+                Util.checkInt(ctx, type, key);
+            }
+        } 
+        if(type.endsWith("char")) {
+            for(String key : syms) {
+                Util.checkStr(ctx, type, key);
+            }
+        } 
     }
 
     @Override public void enterPrimary(ctfParser.PrimaryContext ctx) {
@@ -463,17 +470,14 @@ class CtfListener extends ctfBaseListener{
         //System.out.println(node.getText());
     }
 
-
     @Override public void visitErrorNode(ErrorNode node) {
         CommonToken tk = (CommonToken)node.getPayload();
         throw new RuntimeException(String.format("Syntax error at Line %d", tk.getLine()));
     }
 }
 
-
 public class Trans{
     public static void main(String[] args) {
-
         try {
             CharStream ctf = fromFileName("A.java");  //load the file
             ctfLexer lexer = new ctfLexer(ctf);  //instantiate a lexer
@@ -487,8 +491,6 @@ public class Trans{
         } catch(Exception e) {
             e.printStackTrace();
         }
-
     }
 }
-
 
