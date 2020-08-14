@@ -328,6 +328,10 @@ class CtfListener extends ctfBaseListener{
         }
     }
 
+    @Override public void exitStatement(ctfParser.StatementContext ctx) { 
+        // nothing to do as no need to submit to parents
+    }
+
     @Override public void enterExpression(ctfParser.ExpressionContext ctx) { 
         if(ctx.IDENTIFIER() != null) {
             CTX.newCache(ctx, "[" + ctx.IDENTIFIER().getText());
@@ -396,6 +400,10 @@ class CtfListener extends ctfBaseListener{
 
     @Override public void enterVariableDeclaratorId(ctfParser.VariableDeclaratorIdContext ctx) { 
         CTX.newCache(ctx);  // to avoid array length expression evaluation 
+    }
+
+    @Override public void exitVariableDeclaratorId(ctfParser.VariableDeclaratorIdContext ctx) { 
+        // nothing to do as to avoid array length expression evaluation 
     }
 
     @Override public void enterVariableDeclaration(ctfParser.VariableDeclarationContext ctx) { 
@@ -472,14 +480,15 @@ class CtfListener extends ctfBaseListener{
 
     @Override public void visitErrorNode(ErrorNode node) {
         CommonToken tk = (CommonToken)node.getPayload();
-        throw new RuntimeException(String.format("Syntax error at Line %d", tk.getLine()));
+        throw new RuntimeException(String.format("Syntax error at Line %d: %s", tk.getLine(), tk.getText()));
     }
 }
 
 public class Trans{
     public static void main(String[] args) {
         try {
-            CharStream ctf = fromFileName("A.java");  //load the file
+            //CharStream ctf = fromFileName("A.java");  //load the file
+            CharStream ctf = fromFileName(args[0]);  //load the file
             ctfLexer lexer = new ctfLexer(ctf);  //instantiate a lexer
             CommonTokenStream tokens = new CommonTokenStream(lexer); //scan stream for tokens
             ctfParser parser = new ctfParser(tokens);  //parse the tokens
