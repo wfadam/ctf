@@ -11,6 +11,7 @@ class CTX {
     static private Map<ParserRuleContext, Map<String, List<String>>> context = new HashMap<ParserRuleContext, Map<String, List<String>>>();
     static private Map<ParserRuleContext, Map<String, Integer>> arrayLen = new HashMap<ParserRuleContext, Map<String, Integer>>();
     static private Map<ParserRuleContext, List<String>> cache = new HashMap<ParserRuleContext, List<String>>();
+    static private ParserRuleContext lastCtx = null;
 
     final public static void create(ParserRuleContext ctx) {
         if(context.get(ctx) == null) {
@@ -53,11 +54,15 @@ class CTX {
     }
 
     final public static List<String> query(ParserRuleContext ctx, String key) {
+		if(lastCtx == null) {
+			lastCtx = ctx;
+		}
         Map<String, List<String>> kv = getContext(ctx);
 
         // for variables
         List<String> ls = kv.get(key);
         if(ls != null) {
+			lastCtx = null;
             return new ArrayList<String>(ls); //defensive copy
         }
 
@@ -65,13 +70,21 @@ class CTX {
         ls = kv.get(key.substring(1));  
         if(ls != null) {
             switch(key.substring(0, 1)) {
-                case "(": return unboxType(ls, "(");
-                case "[": return unboxType(ls, "[");
+                case "(": 
+					lastCtx = null;
+					return unboxType(ls, "(");
+                case "[": 
+					lastCtx = null;
+					return unboxType(ls, "[");
                 default: break;
             }
         }
 
-        throw new RuntimeException(String.format("\n\tLine %d: %s is not defined yet", ctx.getStart().getLine(), key));
+		if(ctx.getParent() != null) {
+			return query(ctx.getParent(), key);
+		}
+
+        throw new RuntimeException(String.format("\n\tLine %d: %s is not defined yet", lastCtx.getStart().getLine(), key));
     }
 
     static public Integer queryLength(ParserRuleContext ctx, String key) {
@@ -223,6 +236,14 @@ class CtfListener extends ctfBaseListener{
     @Override public void enterCompilationUnit(ctfParser.CompilationUnitContext ctx) {
         CTX.create(ctx);
     }
+
+	@Override public void enterBlock(ctfParser.BlockContext ctx) { 
+		if(ctx.getParent().getClass() == ctfParser.StatementContext.class) {
+			String key = String.format("%s:%d", ctx.getClass(), ctx.getStart().getLine());
+			CTX.register(ctx, key, new ArrayList<String>());
+			CTX.create(ctx);
+		}
+	}
     @Override public void enterMethodDeclaration(ctfParser.MethodDeclarationContext ctx) { 
         String key = ctx.IDENTIFIER().getText();
         List<String> types = new ArrayList<String>();
@@ -502,4 +523,5 @@ public class Trans{
         }
     }
 }
+
 

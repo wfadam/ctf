@@ -1,17 +1,12 @@
 char getChar() 
 {
-    return "7";
+	return "7";
 }
 
 int abc(char x)
 {
-    int k = 9;
-    return k;
-}
-
-void main(int args[], int i) {
-    int b = 0;
-//N int args[];
+	int k  = 9;
+	return k;
 }
 
 char ARRR[2] = {"9", "3"};
@@ -35,11 +30,20 @@ b = arr[abc("a")]*3 + 0;
 b = (3 - a) * 0xc + abc("2");
 int i = arr[0] + 3 + abc("4");
 for(i = 0; i < 1; i+=1) {
-    for(i = 0; i < 1; i+=1) {
-        b = b + 1;
-    }
-    break;
+	for(i = 0; i < 1; i+=1) {
+		b = b + 1;
+	}
+	break;
+}
+void main(int args[], int i) {
+	int b = 0;
+	//N int args[];
+	if(abc("cc") == 2) {
+
+	}
 }
 
+
 main(arr, 9); 
+
 
