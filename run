@@ -9,8 +9,8 @@ parserRule='compilationUnit'
 
 #$antlr4 -Dlanguage=JavaScript $lang.g4
 
-#$antlr4  $lang.g4 && \
-#javac  "$lang"Parser.java && \
+$antlr4  $lang.g4 && \
+javac  "$lang"Parser.java && \
 $grun $lang $parserRule -tree $* #-tokens -trace 
 
 

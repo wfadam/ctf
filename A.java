@@ -46,4 +46,7 @@ void main(int args[], int i) {
 
 main(arr, 9); 
 
+char fmt = "%d\n";
 
+printf(fmt, 4, 5);
+//NG int xx = printf();

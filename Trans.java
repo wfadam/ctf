@@ -21,7 +21,6 @@ class CTX {
             arrayLen.put(
                     ctx,
                     new HashMap<String, Integer>());
-            //System.out.printf("Created context %s%s\n", ctx.getClass().getSimpleName(), ctx);
         }
     }
 
@@ -31,7 +30,6 @@ class CTX {
             throw new RuntimeException(String.format("\n\tLine %d: %s is already defined", ctx.getStart().getLine(), key));
         }
         kv.put(key, types);
-        //System.out.printf("Defined %s as %s\n", key, types);
     }
 
     final public static void registerLength(ParserRuleContext ctx, String key, int len) {
@@ -40,7 +38,6 @@ class CTX {
             throw new RuntimeException(String.format("\n\tLine %d: %s is already defined with length", ctx.getStart().getLine(), key));
         }
         kv.put(key, len);
-        //System.out.printf("Recorded %s with length %d\n", key, len);
     }
 
     final private static List<String> unboxType(List<String> ls, String cover) {
@@ -203,22 +200,42 @@ class Util {
         }
     }
 
+//    final public static void checkStr(ParserRuleContext ctx, String expTyp, String key) {
+//        String errmsg = String.format("%s is assigned to %s type in %s", key, expTyp, ctx.getText());
+//        if(isInt(key)) {
+//            throw new RuntimeException(errmsg);
+//        }
+//
+//        if(isChar(key)) { 
+//            if(! "char".equals(expTyp)) {
+//                throw new RuntimeException(errmsg);
+//            }
+//        } else {
+//            List<String> tt = CTX.query(ctx, key);
+//            if(! expTyp.equals(tt.get(0))) {
+//                throw new RuntimeException(String.format("%s with %s type is assigned to %s type in %s", key, tt.get(0), expTyp, ctx.getText()));
+//            } 
+//        }
+//    }
+
     final public static void checkStr(ParserRuleContext ctx, String expTyp, String key) {
         String errmsg = String.format("%s is assigned to %s type in %s", key, expTyp, ctx.getText());
         if(isInt(key)) {
             throw new RuntimeException(errmsg);
         }
 
-        if(isChar(key)) { 
-            if(! "char".equals(expTyp)) {
-                throw new RuntimeException(errmsg);
-            }
-        } else {
-            List<String> tt = CTX.query(ctx, key);
-            if(! expTyp.equals(tt.get(0))) {
-                throw new RuntimeException(String.format("%s with %s type is assigned to %s type in %s", key, tt.get(0), expTyp, ctx.getText()));
-            } 
+		if(isChar(key) && "char".equals(expTyp)) {
+			return;
+		}
+
+        if(isChar(key) && ! "char".equals(expTyp)) {
+			throw new RuntimeException(errmsg);
         }
+
+		List<String> tt = CTX.query(ctx, key);
+		if(! expTyp.equals(tt.get(0))) {
+			throw new RuntimeException(String.format("%s with %s type is assigned to %s type in %s", key, tt.get(0), expTyp, ctx.getText()));
+		} 
     }
 
     final public static void pp(String fmt, Object...args) {
@@ -235,6 +252,11 @@ class Util {
 class CtfListener extends ctfBaseListener{
     @Override public void enterCompilationUnit(ctfParser.CompilationUnitContext ctx) {
         CTX.create(ctx);
+
+        List<String> ls = new ArrayList<String>();
+		ls.add("(void");
+		ls.add("char");
+		CTX.register(ctx, "printf", ls);
     }
 
 	@Override public void enterBlock(ctfParser.BlockContext ctx) { 
@@ -327,6 +349,14 @@ class CtfListener extends ctfBaseListener{
         List<String> types = new ArrayList<String>(CTX.query(ctx, id)); // must copy
         types.remove(0);    // remove return type of the method
         List<String> tt = CTX.dumpCache(ctx); 
+
+		if(id.equals("printf")) {
+			if(tt.size() == 0) {
+				throw new RuntimeException(String.format("No argument is passed to to printf()\n"));
+			}
+			Util.checkStr(ctx, types.get(0), tt.get(0)); // ensure the 1st argument is char type
+			return;
+		}
 
         if(types.size() != tt.size()) {
             throw new RuntimeException(String.format("Incorrect number of arguments supplied to %s(%s)\n", id, types));
