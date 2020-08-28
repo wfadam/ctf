@@ -51,15 +51,15 @@ class CTX {
     }
 
     final public static List<String> query(ParserRuleContext ctx, String key) {
-		if(lastCtx == null) {
-			lastCtx = ctx;
-		}
+        if(lastCtx == null) {
+            lastCtx = ctx;
+        }
         Map<String, List<String>> kv = getContext(ctx);
 
         // for variables
         List<String> ls = kv.get(key);
         if(ls != null) {
-			lastCtx = null;
+            lastCtx = null;
             return new ArrayList<String>(ls); //defensive copy
         }
 
@@ -68,18 +68,18 @@ class CTX {
         if(ls != null) {
             switch(key.substring(0, 1)) {
                 case "(": 
-					lastCtx = null;
-					return unboxType(ls, "(");
+                    lastCtx = null;
+                    return unboxType(ls, "(");
                 case "[": 
-					lastCtx = null;
-					return unboxType(ls, "[");
+                    lastCtx = null;
+                    return unboxType(ls, "[");
                 default: break;
             }
         }
 
-		if(ctx.getParent() != null) {
-			return query(ctx.getParent(), key);
-		}
+        if(ctx.getParent() != null) {
+            return query(ctx.getParent(), key);
+        }
 
         throw new RuntimeException(String.format("\n\tLine %d: %s is not defined yet", lastCtx.getStart().getLine(), key));
     }
@@ -200,23 +200,23 @@ class Util {
         }
     }
 
-//    final public static void checkStr(ParserRuleContext ctx, String expTyp, String key) {
-//        String errmsg = String.format("%s is assigned to %s type in %s", key, expTyp, ctx.getText());
-//        if(isInt(key)) {
-//            throw new RuntimeException(errmsg);
-//        }
-//
-//        if(isChar(key)) { 
-//            if(! "char".equals(expTyp)) {
-//                throw new RuntimeException(errmsg);
-//            }
-//        } else {
-//            List<String> tt = CTX.query(ctx, key);
-//            if(! expTyp.equals(tt.get(0))) {
-//                throw new RuntimeException(String.format("%s with %s type is assigned to %s type in %s", key, tt.get(0), expTyp, ctx.getText()));
-//            } 
-//        }
-//    }
+    //    final public static void checkStr(ParserRuleContext ctx, String expTyp, String key) {
+    //        String errmsg = String.format("%s is assigned to %s type in %s", key, expTyp, ctx.getText());
+    //        if(isInt(key)) {
+    //            throw new RuntimeException(errmsg);
+    //        }
+    //
+    //        if(isChar(key)) { 
+    //            if(! "char".equals(expTyp)) {
+    //                throw new RuntimeException(errmsg);
+    //            }
+    //        } else {
+    //            List<String> tt = CTX.query(ctx, key);
+    //            if(! expTyp.equals(tt.get(0))) {
+    //                throw new RuntimeException(String.format("%s with %s type is assigned to %s type in %s", key, tt.get(0), expTyp, ctx.getText()));
+    //            } 
+    //        }
+    //    }
 
     final public static void checkStr(ParserRuleContext ctx, String expTyp, String key) {
         String errmsg = String.format("%s is assigned to %s type in %s", key, expTyp, ctx.getText());
@@ -224,18 +224,18 @@ class Util {
             throw new RuntimeException(errmsg);
         }
 
-		if(isChar(key) && "char".equals(expTyp)) {
-			return;
-		}
-
-        if(isChar(key) && ! "char".equals(expTyp)) {
-			throw new RuntimeException(errmsg);
+        if(isChar(key) && "char".equals(expTyp)) {
+            return;
         }
 
-		List<String> tt = CTX.query(ctx, key);
-		if(! expTyp.equals(tt.get(0))) {
-			throw new RuntimeException(String.format("%s with %s type is assigned to %s type in %s", key, tt.get(0), expTyp, ctx.getText()));
-		} 
+        if(isChar(key) && ! "char".equals(expTyp)) {
+            throw new RuntimeException(errmsg);
+        }
+
+        List<String> tt = CTX.query(ctx, key);
+        if(! expTyp.equals(tt.get(0))) {
+            throw new RuntimeException(String.format("%s with %s type is assigned to %s type in %s", key, tt.get(0), expTyp, ctx.getText()));
+        } 
     }
 
     final public static void pp(String fmt, Object...args) {
@@ -254,18 +254,18 @@ class CtfListener extends ctfBaseListener{
         CTX.create(ctx);
 
         List<String> ls = new ArrayList<String>();
-		ls.add("(void");
-		ls.add("char");
-		CTX.register(ctx, "printf", ls);
+        ls.add("(void");
+        ls.add("char");
+        CTX.register(ctx, "printf", ls);
     }
 
-	@Override public void enterBlock(ctfParser.BlockContext ctx) { 
-		if(ctx.getParent().getClass() == ctfParser.StatementContext.class) {
-			String key = String.format("%s:%d", ctx.getClass(), ctx.getStart().getLine());
-			CTX.register(ctx, key, new ArrayList<String>());
-			CTX.create(ctx);
-		}
-	}
+    @Override public void enterBlock(ctfParser.BlockContext ctx) { 
+        if(ctx.getParent().getClass() == ctfParser.StatementContext.class) {
+            String key = String.format("%s:%d", ctx.getClass(), ctx.getStart().getLine());
+            CTX.register(ctx, key, new ArrayList<String>());
+            CTX.create(ctx);
+        }
+    }
     @Override public void enterMethodDeclaration(ctfParser.MethodDeclarationContext ctx) { 
         String key = ctx.IDENTIFIER().getText();
         List<String> types = new ArrayList<String>();
@@ -350,13 +350,13 @@ class CtfListener extends ctfBaseListener{
         types.remove(0);    // remove return type of the method
         List<String> tt = CTX.dumpCache(ctx); 
 
-		if(id.equals("printf")) {
-			if(tt.size() == 0) {
-				throw new RuntimeException(String.format("No argument is passed to to printf()\n"));
-			}
-			Util.checkStr(ctx, types.get(0), tt.get(0)); // ensure the 1st argument is char type
-			return;
-		}
+        if(id.equals("printf")) {
+            if(tt.size() == 0) {
+                throw new RuntimeException(String.format("No argument is passed to to printf()\n"));
+            }
+            Util.checkStr(ctx, types.get(0), tt.get(0)); // ensure the 1st argument is char type
+            return;
+        }
 
         if(types.size() != tt.size()) {
             throw new RuntimeException(String.format("Incorrect number of arguments supplied to %s(%s)\n", id, types));
