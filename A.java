@@ -43,6 +43,11 @@ void main(int args[], int i) {
 	}
 }
 
+void pp(char aa[], int bb[]){
+	aa[3] = "32"; // no check boundary
+	bb[0] = 33;
+}
+pp(ARRR, arr);
 
 main(arr, 9); 
 
